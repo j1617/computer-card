@@ -1,12 +1,12 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.1.0
+ * Version: 1.1.1
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.1.0 ',
+  '%c COMPUTER-CARD %c v1.1.1 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -223,14 +223,29 @@ class ComputerCard extends HTMLElement {
     return entities;
   }
 
+  // 计算总功率
+  _getTotalPower(entities) {
+    let total = 0;
+    for (const entity of entities) {
+      if (entity.power !== null && !isNaN(parseFloat(entity.power))) {
+        total += parseFloat(entity.power);
+      }
+    }
+    return total > 0 ? total : null;
+  }
+
   _createComputerItem(entity) {
     const { is_on, name, device_type, ip, mac, power, daily, monthly, has_power_info } = entity;
-    const icon = this._getDeviceIcon(device_type);
+    const icon = this._getDeviceIcon(deviceType);
     const statusColor = is_on ? 'var(--success-color, #22c55e)' : 'var(--error-color, #ef4444)';
     const statusText = is_on ? '运行中' : '已关机';
 
     const ipDisplay = ip ? ip : '--';
     const macDisplay = mac ? mac.toUpperCase() : '--';
+
+    // IP和MAC点击复制
+    const ipClickable = ip ? `onclick="this.textContent='复制成功!'; setTimeout(()=>{this.textContent='${ip}'},1500); navigator.clipboard.writeText('${ip}');"` : '';
+    const macClickable = mac ? `onclick="this.textContent='复制成功!'; setTimeout(()=>{this.textContent='${mac.toUpperCase()}'},1500); navigator.clipboard.writeText('${mac.toUpperCase()}');"` : '';
 
     let powerSection = '';
     if (has_power_info) {
@@ -272,11 +287,11 @@ class ComputerCard extends HTMLElement {
         <div class="computer-details">
           <div class="detail-row">
             <span class="detail-label">IP地址</span>
-            <span class="detail-value">${ipDisplay}</span>
+            <span class="detail-value copyable" ${ipClickable} title="点击复制">${ipDisplay}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">MAC地址</span>
-            <span class="detail-value mac">${macDisplay}</span>
+            <span class="detail-value mac copyable" ${macClickable} title="点击复制">${macDisplay}</span>
           </div>
         </div>
         ${powerSection}
@@ -294,16 +309,31 @@ class ComputerCard extends HTMLElement {
     const onCount = entities.filter(e => e.is_on).length;
     const offCount = totalCount - onCount;
 
+    // 计算总功率
+    const totalPower = this._getTotalPower(entities);
+    const totalPowerDisplay = totalPower !== null ? `${totalPower} W` : '';
+
     let bodyHtml = entities.length > 0
       ? entities.map(e => this._createComputerItem(e)).join('')
       : '<div class="empty-state">未配置电脑实体</div>';
 
-    const statsHtml = totalCount > 0 ? `
-      <div class="stats-bar">
-        <div class="stat-item stat-on"><span class="stat-dot"></span><span class="stat-label">运行中</span><span class="stat-value">${onCount}</span></div>
-        <div class="stat-item stat-off"><span class="stat-dot"></span><span class="stat-label">已关机</span><span class="stat-value">${offCount}</span></div>
-      </div>
-    ` : '';
+    // 统计栏：包含总功率
+    let statsHtml = '';
+    if (totalCount > 0) {
+      statsHtml = `
+        <div class="stats-bar">
+          ${totalPowerDisplay ? `
+            <div class="stat-item stat-power">
+              <span class="stat-icon">⚡</span>
+              <span class="stat-label">总功率</span>
+              <span class="stat-value stat-power-value">${totalPowerDisplay}</span>
+            </div>
+          ` : ''}
+          <div class="stat-item stat-on"><span class="stat-dot"></span><span class="stat-label">运行中</span><span class="stat-value">${onCount}</span></div>
+          <div class="stat-item stat-off"><span class="stat-dot"></span><span class="stat-label">已关机</span><span class="stat-value">${offCount}</span></div>
+        </div>
+      `;
+    }
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -363,6 +393,7 @@ class ComputerCard extends HTMLElement {
           margin: 14px 20px;
           background: var(--secondary-background-color, #f8fafc);
           border-radius: 12px;
+          flex-wrap: wrap;
         }
 
         .stat-item {
@@ -370,14 +401,28 @@ class ComputerCard extends HTMLElement {
           align-items: center;
           gap: 6px;
           flex: 1;
+          min-width: 60px;
           font-size: 12px;
         }
+
+        .stat-icon { font-size: 14px; }
 
         .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
         .stat-on .stat-dot { background: var(--success-color, #22c55e); }
         .stat-off .stat-dot { background: var(--error-color, #ef4444); }
         .stat-label { color: ${secondary_color}; }
         .stat-value { font-weight: 700; margin-left: 2px; }
+
+        .stat-power {
+          background: var(--primary-color, #3b82f6);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 8px;
+          flex: 1.5;
+        }
+        .stat-power .stat-label { color: rgba(255,255,255,0.9); }
+        .stat-power .stat-value { color: white; }
+        .stat-power .stat-icon { font-size: 14px; }
 
         .computer-container {
           padding: 0 12px 12px;
@@ -471,6 +516,20 @@ class ComputerCard extends HTMLElement {
         }
 
         .detail-value.mac { font-size: 11px; }
+
+        .detail-value.copyable {
+          cursor: pointer;
+          padding: 2px 8px;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+        .detail-value.copyable:hover {
+          background: var(--secondary-background-color, #e2e8f0);
+        }
+        .detail-value.copyable:active {
+          background: var(--primary-color, #3b82f6);
+          color: white;
+        }
 
         .power-section {
           display: grid;
