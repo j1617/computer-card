@@ -1,0 +1,8 @@
+{
+  "name": "Computer Card",
+  "content_in_root": true,
+  "render_readme": true,
+  "filename": "computer-card.js",
+  "country": ["CN"],
+  "version": "1.0.0"
+}
