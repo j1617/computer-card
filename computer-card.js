@@ -1,12 +1,12 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.1.1
+ * Version: 1.1.2
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.1.1 ',
+  '%c COMPUTER-CARD %c v1.1.2 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -138,54 +138,41 @@ class ComputerCard extends HTMLElement {
                          switchState.attributes.friendly_name ||
                          switchEntity.replace('switch.', '').replace('binary_sensor.', '').replace(/_/g, ' ');
 
-    // 获取IP地址 - 支持直接填写IP或实体ID
     let ipAddress = null;
     if (entityConfig.ip_entity) {
       if (this._isIpAddress(entityConfig.ip_entity)) {
         ipAddress = entityConfig.ip_entity;
       } else {
         const ipState = this._getState(entityConfig.ip_entity);
-        if (ipState) {
-          ipAddress = ipState.state;
-        }
+        if (ipState) ipAddress = ipState.state;
       }
     }
     if (!ipAddress && switchState.attributes.ip_address) {
       ipAddress = switchState.attributes.ip_address;
     }
 
-    // 获取MAC地址 - 支持直接填写MAC或实体ID
     let macAddress = null;
     if (entityConfig.mac_entity) {
       if (this._isMacAddress(entityConfig.mac_entity)) {
         macAddress = entityConfig.mac_entity;
       } else {
         const macState = this._getState(entityConfig.mac_entity);
-        if (macState) {
-          macAddress = macState.state;
-        }
+        if (macState) macAddress = macState.state;
       }
     }
     if (!macAddress && switchState.attributes.mac_address) {
       macAddress = switchState.attributes.mac_address;
     }
 
-    // 获取功率信息（可选）
     let power = null, daily = null, monthly = null;
     const powerState = this._getState(entityConfig.power_entity);
-    if (powerState) {
-      power = powerState.state;
-    }
+    if (powerState) power = powerState.state;
 
     const dailyState = this._getState(entityConfig.daily_energy_entity);
-    if (dailyState) {
-      daily = dailyState.state;
-    }
+    if (dailyState) daily = dailyState.state;
 
     const monthlyState = this._getState(entityConfig.monthly_energy_entity);
-    if (monthlyState) {
-      monthly = monthlyState.state;
-    }
+    if (monthlyState) monthly = monthlyState.state;
 
     const hasPowerInfo = power !== null || daily !== null || monthly !== null;
 
@@ -196,9 +183,7 @@ class ComputerCard extends HTMLElement {
       device_type: entityConfig.device_type || 'default',
       ip: ipAddress,
       mac: macAddress,
-      power: power,
-      daily: daily,
-      monthly: monthly,
+      power, daily, monthly,
       has_power_info: hasPowerInfo
     };
   }
@@ -223,7 +208,6 @@ class ComputerCard extends HTMLElement {
     return entities;
   }
 
-  // 计算总功率
   _getTotalPower(entities) {
     let total = 0;
     for (const entity of entities) {
@@ -236,16 +220,16 @@ class ComputerCard extends HTMLElement {
 
   _createComputerItem(entity) {
     const { is_on, name, device_type, ip, mac, power, daily, monthly, has_power_info } = entity;
-    const icon = this._getDeviceIcon(deviceType);
+    const icon = this._getDeviceIcon(device_type);
     const statusColor = is_on ? 'var(--success-color, #22c55e)' : 'var(--error-color, #ef4444)';
     const statusText = is_on ? '运行中' : '已关机';
 
     const ipDisplay = ip ? ip : '--';
     const macDisplay = mac ? mac.toUpperCase() : '--';
 
-    // IP和MAC点击复制
-    const ipClickable = ip ? `onclick="this.textContent='复制成功!'; setTimeout(()=>{this.textContent='${ip}'},1500); navigator.clipboard.writeText('${ip}');"` : '';
-    const macClickable = mac ? `onclick="this.textContent='复制成功!'; setTimeout(()=>{this.textContent='${mac.toUpperCase()}'},1500); navigator.clipboard.writeText('${mac.toUpperCase()}');"` : '';
+    // 用 data-copy 属性存储要复制的值，不用 inline onclick
+    const ipAttr = ip ? `data-copy="${ip}"` : '';
+    const macAttr = mac ? `data-copy="${mac.toUpperCase()}"` : '';
 
     let powerSection = '';
     if (has_power_info) {
@@ -287,16 +271,52 @@ class ComputerCard extends HTMLElement {
         <div class="computer-details">
           <div class="detail-row">
             <span class="detail-label">IP地址</span>
-            <span class="detail-value copyable" ${ipClickable} title="点击复制">${ipDisplay}</span>
+            <span class="detail-value copyable" ${ipAttr} title="点击复制">${ipDisplay}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">MAC地址</span>
-            <span class="detail-value mac copyable" ${macClickable} title="点击复制">${macDisplay}</span>
+            <span class="detail-value mac copyable" ${macAttr} title="点击复制">${macDisplay}</span>
           </div>
         </div>
         ${powerSection}
       </div>
     `;
+  }
+
+  // 绑定复制事件（Shadow DOM 内不支持 inline onclick）
+  _bindCopyEvents() {
+    const copyables = this.shadowRoot.querySelectorAll('.copyable[data-copy]');
+    copyables.forEach(el => {
+      el.addEventListener('click', () => {
+        const text = el.getAttribute('data-copy');
+        if (!text) return;
+        const original = el.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          el.textContent = '已复制!';
+          el.classList.add('copied');
+          setTimeout(() => {
+            el.textContent = original;
+            el.classList.remove('copied');
+          }, 1200);
+        }).catch(() => {
+          // fallback: 旧浏览器
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          el.textContent = '已复制!';
+          el.classList.add('copied');
+          setTimeout(() => {
+            el.textContent = original;
+            el.classList.remove('copied');
+          }, 1200);
+        });
+      });
+    });
   }
 
   _updateCard() {
@@ -309,7 +329,6 @@ class ComputerCard extends HTMLElement {
     const onCount = entities.filter(e => e.is_on).length;
     const offCount = totalCount - onCount;
 
-    // 计算总功率
     const totalPower = this._getTotalPower(entities);
     const totalPowerDisplay = totalPower !== null ? `${totalPower} W` : '';
 
@@ -317,7 +336,6 @@ class ComputerCard extends HTMLElement {
       ? entities.map(e => this._createComputerItem(e)).join('')
       : '<div class="empty-state">未配置电脑实体</div>';
 
-    // 统计栏：包含总功率
     let statsHtml = '';
     if (totalCount > 0) {
       statsHtml = `
@@ -526,8 +544,8 @@ class ComputerCard extends HTMLElement {
         .detail-value.copyable:hover {
           background: var(--secondary-background-color, #e2e8f0);
         }
-        .detail-value.copyable:active {
-          background: var(--primary-color, #3b82f6);
+        .detail-value.copyable.copied {
+          background: var(--success-color, #22c55e);
           color: white;
         }
 
@@ -595,6 +613,9 @@ class ComputerCard extends HTMLElement {
         </div>
       </ha-card>
     `;
+
+    // 渲染后绑定复制事件
+    this._bindCopyEvents();
   }
 }
 
