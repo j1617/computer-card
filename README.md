@@ -5,14 +5,19 @@ HA插件交流QQ群： 754364399
 关注公众号【工具箱达人】，里面有详细的使用教程
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://hacs.xyz/)
-[![version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/j1617/computer-card)
+[![version](https://img.shields.io/badge/version-1.1.4-blue.svg)](https://github.com/j1617/computer-card)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 一个优雅的 Home Assistant Lovelace 自定义卡片，显示电脑的运行状态、IP地址、MAC地址及用电信息。
 
-**当前版本: v1.1.3**
+**当前版本: v1.1.4**
 
 ## 更新记录
+
+### v1.1.4 (2026-05-18)
+
+#### 修复
+- 🐛 修复点击复制功能不生效（clipboard API 在 HA iframe 中受限，增加 textarea fallback）
 
 ### v1.1.3 (2026-05-18)
 
@@ -308,7 +313,7 @@ secondary_color: '#94a3b8'
 ## 项目信息
 
 - **GitHub**: https://github.com/j1617/computer-card
-- **版本**: v1.1.3
+- **版本**: v1.1.4
 - **许可证**: MIT
 
 ## 许可证

@@ -1,12 +1,12 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.1.3
+ * Version: 1.1.4
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.1.3 ',
+  '%c COMPUTER-CARD %c v1.1.4 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -301,34 +301,44 @@ class ComputerCard extends HTMLElement {
   _bindCopyEvents() {
     const copyables = this.shadowRoot.querySelectorAll('.copyable[data-copy]');
     copyables.forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', async () => {
         const text = el.getAttribute('data-copy');
         if (!text) return;
         const original = el.textContent;
-        navigator.clipboard.writeText(text).then(() => {
-          el.textContent = '已复制!';
-          el.classList.add('copied');
-          setTimeout(() => {
-            el.textContent = original;
-            el.classList.remove('copied');
-          }, 1200);
-        }).catch(() => {
-          // fallback: 旧浏览器
+        let copied = false;
+        // 方案1: clipboard API
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          } catch (e) {
+            // HA iframe 限制，走 fallback
+          }
+        }
+        // 方案2: textarea fallback
+        if (!copied) {
           const ta = document.createElement('textarea');
           ta.value = text;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
+          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
           document.body.appendChild(ta);
+          ta.focus();
           ta.select();
-          document.execCommand('copy');
+          try {
+            document.execCommand('copy');
+            copied = true;
+          } catch (e) {
+            // ignore
+          }
           document.body.removeChild(ta);
+        }
+        if (copied) {
           el.textContent = '已复制!';
           el.classList.add('copied');
           setTimeout(() => {
             el.textContent = original;
             el.classList.remove('copied');
           }, 1200);
-        });
+        }
       });
     });
   }
