@@ -1,12 +1,12 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.1.2
+ * Version: 1.1.3
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.1.2 ',
+  '%c COMPUTER-CARD %c v1.1.3 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -48,7 +48,21 @@ class ComputerCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this._updateCard();
+    // 只在数据变化时才重新渲染，避免鼠标悬停闪烁
+    if (this._dataChanged()) {
+      this._updateCard();
+    }
+  }
+
+  _dataChanged() {
+    if (!this._hass || !this.config) return true;
+    const entities = this._getComputerEntities();
+    const newHash = JSON.stringify(entities.map(e => ({
+      on: e.is_on, ip: e.ip, mac: e.mac, power: e.power, daily: e.daily, monthly: e.monthly
+    })));
+    if (newHash === this._lastDataHash) return false;
+    this._lastDataHash = newHash;
+    return true;
   }
 
   connectedCallback() {
