@@ -5,12 +5,26 @@ HA插件交流QQ群： 754364399
 关注公众号【工具箱达人】，里面有详细的使用教程
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://hacs.xyz/)
-[![version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/j1617/computer-card)
+[![version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/j1617/computer-card)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 一个优雅的 Home Assistant Lovelace 自定义卡片，显示电脑的运行状态、IP地址、MAC地址及用电信息。
 
-**当前版本: v1.0.0**
+**当前版本: v1.1.0**
+
+## 更新记录
+
+### v1.1.0 (2026-05-18)
+
+#### 新增
+- `ip_entity` 支持直接填写 IP 地址，例如 `ip_entity: "192.168.1.94"`
+- `mac_entity` 支持直接填写 MAC 地址，例如 `mac_entity: "80:FA:5B:1E:92:03"`
+- 自动识别格式：IP 格式 → 直接使用；MAC 格式 → 直接使用；其他 → 作为实体 ID 读取
+
+#### 兼容性
+- 原有传感器实体写法完全兼容，无需修改已有配置
+
+---
 
 ## 预览效果
 
@@ -62,8 +76,8 @@ HA插件交流QQ群： 754364399
 
 - ✅ **运行状态** - 实时显示电脑开启/关闭状态
 - 🖥️ **设备图标** - 支持台式机、笔记本、服务器、NAS、平板等图标
-- 🌐 **IP地址** - 显示电脑当前IP地址
-- 📋 **MAC地址** - 显示电脑MAC地址
+- 🌐 **IP地址** - 支持直接填写或传感器实体
+- 📋 **MAC地址** - 支持直接填写或传感器实体
 - ⚡ **用电信息** - 可选显示实时功率、日用电量、月用电量
 - 📱 **多模式显示** - 纵向列表 / 横向Grid布局
 - 🎨 **主题适配** - 自动适配HA深色/浅色主题
@@ -118,8 +132,8 @@ entities:
   - name: 主力台式机
     switch_entity: switch.desktop_power
     device_type: desktop
-    ip_entity: sensor.desktop_ip
-    mac_entity: sensor.desktop_mac
+    ip_entity: "192.168.1.94"               # ← 直接填IP
+    mac_entity: "80:FA:5B:1E:92:03"         # ← 直接填MAC
     power_entity: sensor.desktop_power_watt
     daily_energy_entity: sensor.desktop_daily_energy
     monthly_energy_entity: sensor.desktop_monthly_energy
@@ -135,21 +149,19 @@ entities:
   - name: 主力台式机
     switch_entity: switch.desktop_main
     device_type: desktop
-    ip_entity: sensor.desktop_main_ip
-    mac_entity: sensor.desktop_main_mac
+    ip_entity: "192.168.1.94"               # 直接填IP
+    mac_entity: "80:FA:5B:1E:92:03"         # 直接填MAC
     power_entity: sensor.desktop_main_power
-    daily_energy_entity: sensor.desktop_main_daily
-    monthly_energy_entity: sensor.desktop_main_monthly
   - name: 工作笔记本
     switch_entity: switch.laptop_work
     device_type: laptop
-    ip_entity: sensor.laptop_work_ip
+    ip_entity: sensor.laptop_work_ip          # 也可以填传感器实体（兼容）
     mac_entity: sensor.laptop_work_mac
   - name: 家用服务器
     switch_entity: switch.home_server
     device_type: server
-    ip_entity: sensor.server_ip
-    mac_entity: sensor.server_mac
+    ip_entity: "192.168.1.1"
+    mac_entity: "AA:BB:CC:DD:EE:FF"
     power_entity: sensor.server_power
 ```
 
@@ -164,22 +176,20 @@ entities:
   - name: 主力台式机
     switch_entity: switch.desktop_main
     device_type: desktop
-    ip_entity: sensor.desktop_main_ip
-    mac_entity: sensor.desktop_main_mac
+    ip_entity: "192.168.1.94"
   - name: 工作笔记本
     switch_entity: switch.laptop_work
     device_type: laptop
-    ip_entity: sensor.laptop_work_ip
+    ip_entity: "192.168.1.95"
   - name: NAS存储
     switch_entity: switch.nas
     device_type: nas
-    ip_entity: sensor.nas_ip
-    mac_entity: sensor.nas_mac
+    ip_entity: "192.168.1.100"
     power_entity: sensor.nas_power
   - name: 平板电脑
     switch_entity: switch.tablet
     device_type: tablet
-    ip_entity: sensor.tablet_ip
+    ip_entity: "192.168.1.200"
 ```
 
 ## 配置选项
@@ -200,11 +210,13 @@ entities:
 | `name` | string | 实体名称 | 电脑名称 |
 | `switch_entity` | string | required | 开关/状态实体（必需）|
 | `device_type` | string | default | 设备类型：desktop / laptop / server / nas / tablet / mini_pc |
-| `ip_entity` | string | null | IP地址传感器 |
-| `mac_entity` | string | null | MAC地址传感器 |
+| `ip_entity` | string | null | IP地址（**支持直接填写**，如 `"192.168.1.94"`）或传感器实体 |
+| `mac_entity` | string | null | MAC地址（**支持直接填写**，如 `"80:FA:5B:1E:92:03"`）或传感器实体 |
 | `power_entity` | string | null | 实时功率传感器（W）|
 | `daily_energy_entity` | string | null | 日用电量传感器（kWh）|
 | `monthly_energy_entity` | string | null | 月用电量传感器（kWh）|
+
+> **v1.1.0 新增**：`ip_entity` 和 `mac_entity` 支持直接填写 IP/MAC 地址，同时也兼容原有传感器实体写法。
 
 ### 设备图标
 
@@ -262,9 +274,9 @@ entities:
 
 ### IP/MAC地址显示"--"
 
-1. 确认配置了对应的 `ip_entity` 或 `mac_entity`
-2. 检查实体状态是否为有效值
-3. 部分设备可能将IP/MAC存储在实体的属性中
+1. 确认 `ip_entity` / `mac_entity` 配置正确
+2. 直接填写时，格式须符合 IP（`x.x.x.x`）或 MAC（`xx:xx:xx:xx:xx:xx`）
+3. 填写实体ID时，确认对应传感器状态为有效值
 
 ### 深色主题适配
 
@@ -280,7 +292,7 @@ secondary_color: '#94a3b8'
 ## 项目信息
 
 - **GitHub**: https://github.com/j1617/computer-card
-- **版本**: v1.0.0
+- **版本**: v1.1.0
 - **许可证**: MIT
 
 ## 许可证

@@ -1,12 +1,12 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.0.0
+ * Version: 1.1.0
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.0.0 ',
+  '%c COMPUTER-CARD %c v1.1.0 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -36,7 +36,6 @@ class ComputerCard extends HTMLElement {
       display_mode: 'vertical',
       columns: 2,
       entities: config.entities || [],
-      // 样式配置（使用HA变量作为默认值）
       background_color: 'var(--ha-card-background, #ffffff)',
       text_color: 'var(--primary-text-color, #1e293b)',
       secondary_color: 'var(--secondary-text-color, #64748b)',
@@ -63,7 +62,6 @@ class ComputerCard extends HTMLElement {
     return 0;
   }
 
-  // HA Grid 布局支持
   getCardSize() {
     const count = this._entityCount || 1;
     if (this.config.display_mode === 'horizontal') {
@@ -91,6 +89,14 @@ class ComputerCard extends HTMLElement {
   _getState(entityId) {
     if (!entityId || !this._hass) return null;
     return this._hass.states[entityId] || null;
+  }
+
+  _isIpAddress(value) {
+    return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(value);
+  }
+
+  _isMacAddress(value) {
+    return /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/.test(value);
   }
 
   _getDeviceIcon(deviceType) {
@@ -122,7 +128,6 @@ class ComputerCard extends HTMLElement {
   }
 
   _buildComputerItem(entityConfig) {
-    // 获取开关状态
     const switchEntity = entityConfig.switch_entity || entityConfig.entity;
     const switchState = this._getState(switchEntity);
 
@@ -133,21 +138,35 @@ class ComputerCard extends HTMLElement {
                          switchState.attributes.friendly_name ||
                          switchEntity.replace('switch.', '').replace('binary_sensor.', '').replace(/_/g, ' ');
 
-    // 获取IP地址
+    // 获取IP地址 - 支持直接填写IP或实体ID
     let ipAddress = null;
-    const ipState = this._getState(entityConfig.ip_entity);
-    if (ipState) {
-      ipAddress = ipState.state;
-    } else if (switchState.attributes.ip_address) {
+    if (entityConfig.ip_entity) {
+      if (this._isIpAddress(entityConfig.ip_entity)) {
+        ipAddress = entityConfig.ip_entity;
+      } else {
+        const ipState = this._getState(entityConfig.ip_entity);
+        if (ipState) {
+          ipAddress = ipState.state;
+        }
+      }
+    }
+    if (!ipAddress && switchState.attributes.ip_address) {
       ipAddress = switchState.attributes.ip_address;
     }
 
-    // 获取MAC地址
+    // 获取MAC地址 - 支持直接填写MAC或实体ID
     let macAddress = null;
-    const macState = this._getState(entityConfig.mac_entity);
-    if (macState) {
-      macAddress = macState.state;
-    } else if (switchState.attributes.mac_address) {
+    if (entityConfig.mac_entity) {
+      if (this._isMacAddress(entityConfig.mac_entity)) {
+        macAddress = entityConfig.mac_entity;
+      } else {
+        const macState = this._getState(entityConfig.mac_entity);
+        if (macState) {
+          macAddress = macState.state;
+        }
+      }
+    }
+    if (!macAddress && switchState.attributes.mac_address) {
       macAddress = switchState.attributes.mac_address;
     }
 
@@ -210,11 +229,9 @@ class ComputerCard extends HTMLElement {
     const statusColor = is_on ? 'var(--success-color, #22c55e)' : 'var(--error-color, #ef4444)';
     const statusText = is_on ? '运行中' : '已关机';
 
-    // IP和MAC显示
     const ipDisplay = ip ? ip : '--';
     const macDisplay = mac ? mac.toUpperCase() : '--';
 
-    // 功率显示
     let powerSection = '';
     if (has_power_info) {
       const powerDisplay = power !== null ? `${this._formatNumber(power, 0)} W` : '--';
