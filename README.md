@@ -5,16 +5,32 @@ HA插件交流QQ群： 754364399
 关注公众号【工具箱达人】，里面有详细的使用教程
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://hacs.xyz/)
-[![version](https://img.shields.io/badge/version-1.1.4-blue.svg)](https://github.com/j1617/computer-card)
+[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/j1617/computer-card)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 一个优雅的 Home Assistant Lovelace 自定义卡片，显示电脑的运行状态、IP地址、MAC地址及用电信息。
 
-**当前版本: v1.1.4**
+**当前版本: v1.2.0**
 
 ## 更新记录
 
-### v1.1.4 (2026-05-18)
+### v1.2.0 (2026-05-26)
+
+#### 新增
+- ✨ **开关机** - 新增 `toggle_entity` 参数，可在卡片上直接控制电脑开关
+
+#### 使用方法
+```yaml
+type: custom:computer-card
+entities:
+  - name: 台式机
+    switch_entity: switch.desktop_power
+    toggle_entity: switch.desktop_power  # ← 新增：开关实体
+```
+
+#### 注意事项
+- 用户未配置 `toggle_entity` 时，按钮不显示
+- 点击开机/关机按钮时，会先弹出确认对话框，用户确认后才执行操作
 
 #### 修复
 - 🐛 修复点击复制功能不生效（clipboard API 在 HA iframe 中受限，增加 textarea fallback）

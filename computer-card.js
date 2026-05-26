@@ -1,12 +1,13 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.1.4
+ * Version: 1.2.0
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
+ * v1.2.0: Add toggle_entity support with confirmation dialog
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.1.4 ',
+  '%c COMPUTER-CARD %c v1.2.0 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -66,7 +67,75 @@ class ComputerCard extends HTMLElement {
   }
 
   connectedCallback() {
+    this._injectGlobalStyles();
     this._updateCard();
+  }
+
+  _injectGlobalStyles() {
+    if (document.getElementById('computer-card-global-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'computer-card-global-styles';
+    style.textContent = `
+      .computer-card-confirm-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999999;
+        animation: fadeIn 0.2s ease-out;
+      }
+      .computer-card-confirm-dialog {
+        background: var(--ha-card-background, #fff);
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 320px;
+        width: 90%;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        animation: slideUp 0.3s ease-out;
+      }
+      .computer-card-confirm-message {
+        font-size: 16px;
+        text-align: center;
+        margin-bottom: 24px;
+        color: var(--primary-text-color, #1e293b);
+      }
+      .computer-card-confirm-buttons {
+        display: flex;
+        gap: 12px;
+      }
+      .computer-card-confirm-btn {
+        flex: 1;
+        padding: 12px 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      .computer-card-confirm-btn:hover {
+        opacity: 0.9;
+      }
+      .computer-card-confirm-cancel {
+        background: var(--secondary-card-background, #f1f5f9);
+        color: var(--primary-text-color, #1e293b);
+      }
+      .computer-card-confirm-ok {
+        background: #3b82f6;
+        color: white;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   _getEntityCount() {
@@ -95,8 +164,8 @@ class ComputerCard extends HTMLElement {
 
   getLayoutOptions() {
     return {
-      grid_columns: this.config.display_mode === 'horizontal' ? 12 : 6,
-      grid_rows: this.getCardSize()
+      type: 'grid',
+      ...this.getGridOptions()
     };
   }
 
@@ -190,6 +259,10 @@ class ComputerCard extends HTMLElement {
 
     const hasPowerInfo = power !== null || daily !== null || monthly !== null;
 
+    // 开关实体（可选，用于控制开关机）
+    const toggleEntity = entityConfig.toggle_entity || null;
+    const hasToggle = !!toggleEntity;
+
     return {
       switch_entity: switchEntity,
       name: friendlyName,
@@ -198,7 +271,9 @@ class ComputerCard extends HTMLElement {
       ip: ipAddress,
       mac: macAddress,
       power, daily, monthly,
-      has_power_info: hasPowerInfo
+      has_power_info: hasPowerInfo,
+      toggle_entity: toggleEntity,
+      has_toggle: hasToggle
     };
   }
 
@@ -225,15 +300,16 @@ class ComputerCard extends HTMLElement {
   _getTotalPower(entities) {
     let total = 0;
     for (const entity of entities) {
-      if (entity.power !== null && !isNaN(parseFloat(entity.power))) {
-        total += parseFloat(entity.power);
+      if (entity.power !== null) {
+        const val = parseFloat(entity.power);
+        if (!isNaN(val)) total += val;
       }
     }
     return total > 0 ? total : null;
   }
 
   _createComputerItem(entity) {
-    const { is_on, name, device_type, ip, mac, power, daily, monthly, has_power_info } = entity;
+    const { is_on, name, device_type, ip, mac, power, daily, monthly, has_power_info, toggle_entity, has_toggle } = entity;
     const icon = this._getDeviceIcon(device_type);
     const statusColor = is_on ? 'var(--success-color, #22c55e)' : 'var(--error-color, #ef4444)';
     const statusText = is_on ? '运行中' : '已关机';
@@ -241,9 +317,24 @@ class ComputerCard extends HTMLElement {
     const ipDisplay = ip ? ip : '--';
     const macDisplay = mac ? mac.toUpperCase() : '--';
 
-    // 用 data-copy 属性存储要复制的值，不用 inline onclick
+    // 用 data-copy 属性存储要复制的值不用 inline onclick
     const ipAttr = ip ? `data-copy="${ip}"` : '';
     const macAttr = mac ? `data-copy="${mac.toUpperCase()}"` : '';
+
+    // 开关按钮（如果有 toggle_entity）
+    let toggleHtml = '';
+    if (has_toggle && toggle_entity) {
+      const targetState = is_on ? 'off' : 'on';
+      const btnLabel = is_on ? '关机' : '开机';
+      const btnClass = is_on ? 'toggle-off' : 'toggle-on';
+      toggleHtml = `
+        <div class="toggle-section">
+          <button class="toggle-btn ${btnClass}" data-entity="${toggle_entity}" data-action="${targetState}" data-name="${name}">
+            ${btnLabel}
+          </button>
+        </div>
+      `;
+    }
 
     let powerSection = '';
     if (has_power_info) {
@@ -293,6 +384,7 @@ class ComputerCard extends HTMLElement {
           </div>
         </div>
         ${powerSection}
+        ${toggleHtml}
       </div>
     `;
   }
@@ -306,30 +398,24 @@ class ComputerCard extends HTMLElement {
         if (!text) return;
         const original = el.textContent;
         let copied = false;
-        // 方案1: clipboard API
-        if (navigator.clipboard && navigator.clipboard.writeText) {
+        // ��案1: clipboard API
+        try {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        } catch {
+          // 方案2: textarea fallback
           try {
-            await navigator.clipboard.writeText(text);
-            copied = true;
-          } catch (e) {
-            // HA iframe 限制，走 fallback
-          }
-        }
-        // 方案2: textarea fallback
-        if (!copied) {
-          const ta = document.createElement('textarea');
-          ta.value = text;
-          ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          try {
-            document.execCommand('copy');
-            copied = true;
-          } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            copied = document.execCommand('copy');
+            document.body.removeChild(ta);
+          } catch {
             // ignore
           }
-          document.body.removeChild(ta);
         }
         if (copied) {
           el.textContent = '已复制!';
@@ -339,6 +425,60 @@ class ComputerCard extends HTMLElement {
             el.classList.remove('copied');
           }, 1200);
         }
+      });
+    });
+  }
+
+  // 绑定开关按钮事件
+  _bindToggleEvents() {
+    const toggleBtns = this.shadowRoot.querySelectorAll('.toggle-btn[data-entity]');
+    toggleBtns.forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const entity = btn.getAttribute('data-entity');
+        const action = btn.getAttribute('data-action');
+        const name = btn.getAttribute('data-name');
+        const targetState = action === 'on' ? '开启' : '关闭';
+        const confirmed = await this._showConfirmDialog(`${targetState} "${name}"？`);
+        if (confirmed) {
+          this._updateState(entity, action);
+        }
+      });
+    });
+  }
+
+  _updateState(entityId, newState) {
+    this._hass.callService('homeassistant', 'turn_' + newState, {
+      entity_id: entityId
+    });
+  }
+
+  // 确认对话框
+  _showConfirmDialog(message) {
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.className = 'computer-card-confirm-overlay';
+      overlay.innerHTML = `
+        <div class="computer-card-confirm-dialog">
+          <div class="computer-card-confirm-message">${message}</div>
+          <div class="computer-card-confirm-buttons">
+            <button class="computer-card-confirm-btn computer-card-confirm-cancel">取消</button>
+            <button class="computer-card-confirm-btn computer-card-confirm-ok">确认</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const cancelBtn = overlay.querySelector('.computer-card-confirm-cancel');
+      const okBtn = overlay.querySelector('.computer-card-confirm-ok');
+      const close = (result) => {
+        overlay.remove();
+        resolve(result);
+      };
+
+      cancelBtn.addEventListener('click', () => close(false));
+      okBtn.addEventListener('click', () => close(true));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) close(false);
       });
     });
   }
@@ -377,269 +517,223 @@ class ComputerCard extends HTMLElement {
       `;
     }
 
+    const isHorizontal = display_mode === 'horizontal';
+    const gridClass = isHorizontal ? 'horizontal' : 'vertical';
+
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; height: 100%; }
-
+        :host { display: block; }
         ha-card {
           background: ${background_color};
           border-radius: var(--ha-card-border-radius, 16px);
           box-shadow: var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,0.08));
-          overflow: visible;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
+          padding: 16px;
+          overflow: hidden;
         }
-
-        .card-content {
-          padding: 0;
-          font-family: var(--paper-font-common-base_-_font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-          color: ${text_color};
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .card-header {
-          padding: 18px 20px 0;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-
         .card-title {
-          display: flex;
-          align-items: center;
-          gap: 10px;
           font-size: 18px;
-          font-weight: 700;
-        }
-
-        .title-icon { font-size: 22px; }
-
-        .computer-count {
-          background: var(--chip-background-color, #f1f5f9);
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 12px;
           font-weight: 600;
-          color: ${secondary_color};
+          color: ${text_color};
+          margin: 0 0 16px 0;
         }
-
         .stats-bar {
           display: flex;
-          gap: 12px;
-          padding: 12px 20px;
-          margin: 14px 20px;
-          background: var(--secondary-background-color, #f8fafc);
-          border-radius: 12px;
           flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 16px;
+          padding: 12px;
+          background: var(--secondary-card-background, var(--ha-card-background, #f8fafc));
+          border-radius: 8px;
         }
-
         .stat-item {
           display: flex;
           align-items: center;
           gap: 6px;
-          flex: 1;
-          min-width: 60px;
-          font-size: 12px;
+          font-size: 13px;
+          color: ${secondary_color};
         }
-
-        .stat-icon { font-size: 14px; }
-
-        .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
-        .stat-on .stat-dot { background: var(--success-color, #22c55e); }
-        .stat-off .stat-dot { background: var(--error-color, #ef4444); }
-        .stat-label { color: ${secondary_color}; }
-        .stat-value { font-weight: 700; margin-left: 2px; }
-
-        .stat-power {
-          background: var(--primary-color, #3b82f6);
-          color: white;
-          padding: 6px 12px;
-          border-radius: 8px;
-          flex: 1.5;
+        .stat-icon {
+          font-size: 14px;
         }
-        .stat-power .stat-label { color: rgba(255,255,255,0.9); }
-        .stat-power .stat-value { color: white; }
-        .stat-power .stat-icon { font-size: 14px; }
-
-        .computer-container {
-          padding: 0 12px 12px;
-          overflow: visible;
-          flex: 1;
-          ${display_mode === 'horizontal' ? `display: grid; grid-template-columns: repeat(${columns || 2}, 1fr); gap: 12px;` : ''}
+        .stat-dot {
+          display: inline-block;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #94a3b8;
         }
-
-        @media (max-width: 600px) {
-          .computer-container { grid-template-columns: 1fr !important; }
+        .stat-on .stat-dot { background: #22c55e; }
+        .stat-off .stat-dot { background: #ef4444; }
+        .stat-power-value {
+          font-weight: 600;
+          color: ${text_color};
         }
-
+        .computers-grid.horizontal {
+          display: grid;
+          grid-template-columns: repeat(${columns || 2}, 1fr);
+          gap: 12px;
+        }
+        .computers-grid.vertical {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
         .computer-item {
-          background: var(--secondary-background-color, #f8fafc);
-          border-radius: 14px;
           padding: 16px;
-          transition: all 0.2s ease;
-          min-width: 0;
-          border-left: 4px solid transparent;
+          border-radius: 12px;
+          background: var(--secondary-card-background, var(--ha-card-background, #f8fafc));
+          border-left: 3px solid #94a3b8;
         }
-
-        .computer-item.on { border-left-color: var(--success-color, #22c55e); }
-        .computer-item.off { border-left-color: var(--error-color, #ef4444); }
-
+        .computer-item.on {
+          border-left-color: #22c55e;
+        }
+        .computer-item.off {
+          border-left-color: #ef4444;
+        }
         .computer-header {
           display: flex;
           align-items: center;
           gap: 12px;
           margin-bottom: 12px;
         }
-
         .computer-icon {
-          font-size: 32px;
-          width: 50px;
-          height: 50px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--card-background-color, #fff);
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+          font-size: 28px;
         }
-
-        .computer-info { flex: 1; min-width: 0; }
-
+        .computer-info {
+          flex: 1;
+        }
         .computer-name {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           color: ${text_color};
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
-
         .computer-status {
           display: flex;
           align-items: center;
           gap: 6px;
           font-size: 12px;
-          font-weight: 500;
-          margin-top: 4px;
+          margin-top: 2px;
         }
-
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
-
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+        }
         .computer-details {
-          background: var(--card-background-color, #fff);
-          border-radius: 10px;
-          padding: 12px;
-          margin-bottom: 10px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 12px;
         }
-
         .detail-row {
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          padding: 6px 0;
+          font-size: 13px;
         }
-
-        .detail-row:not(:last-child) { border-bottom: 1px solid var(--divider-color, #f1f5f9); }
-
         .detail-label {
-          font-size: 12px;
           color: ${secondary_color};
         }
-
         .detail-value {
-          font-size: 13px;
-          font-weight: 600;
-          font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+          color: ${text_color};
+          font-family: ui-monospace, monospace;
+          font-size: 12px;
         }
-
-        .detail-value.mac { font-size: 11px; }
-
         .detail-value.copyable {
           cursor: pointer;
-          padding: 2px 8px;
+          padding: 2px 6px;
           border-radius: 4px;
           transition: background 0.2s;
         }
         .detail-value.copyable:hover {
-          background: var(--secondary-background-color, #e2e8f0);
+          background: var(--secondary-card-background, #e2e8f0);
         }
         .detail-value.copyable.copied {
-          background: var(--success-color, #22c55e);
-          color: white;
+          color: #22c55e;
+          font-weight: 500;
         }
-
         .power-section {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
+          display: flex;
+          flex-wrap: wrap;
           gap: 8px;
+          padding-top: 12px;
+          border-top: 1px solid var(--divider-color, #e2e8f0);
+          margin-top: 4px;
         }
-
         .power-item {
-          background: var(--card-background-color, #fff);
-          border-radius: 10px;
-          padding: 10px 12px;
-          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          flex: 1;
+          min-width: 70px;
         }
-
-        .power-item:first-child { grid-column: 1 / -1; }
-
-        .power-icon { font-size: 16px; display: block; margin-bottom: 4px; }
-        .power-value { font-size: 18px; font-weight: 700; display: block; }
-        .power-value.daily { color: #3b82f6; }
-        .power-value.monthly { color: #8b5cf6; }
-        .power-label { font-size: 10px; color: ${secondary_color}; display: block; margin-top: 2px; }
-
-        .empty-state {
-          padding: 40px 20px;
-          text-align: center;
-          color: ${secondary_color};
+        .power-icon {
           font-size: 14px;
         }
-
-        .card-footer {
-          padding: 12px 20px 18px;
-          border-top: 1px solid var(--divider-color, #f1f5f9);
-          margin-top: auto;
+        .power-value {
+          font-size: 14px;
+          font-weight: 600;
+          color: ${text_color};
         }
-
-        .update-info {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11px;
+        .power-value.daily {
+          color: #f59e0b;
+        }
+        .power-value.monthly {
+          color: #8b5cf6;
+        }
+        .power-label {
+          font-size: 10px;
           color: ${secondary_color};
+          text-align: center;
         }
-
-        .update-dot {
-          width: 6px;
-          height: 6px;
-          background: var(--primary-color, #3b82f6);
-          border-radius: 50%;
+        .toggle-section {
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid var(--divider-color, #e2e8f0);
+        }
+        .toggle-btn {
+          width: 100%;
+          padding: 10px 16px;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: opacity 0.2s, transform 0.1s;
+        }
+        .toggle-btn:hover {
+          opacity: 0.9;
+        }
+        .toggle-btn:active {
+          transform: scale(0.98);
+        }
+        .toggle-btn.toggle-on {
+          background: #22c55e;
+          color: white;
+        }
+        .toggle-btn.toggle-off {
+          background: #ef4444;
+          color: white;
+        }
+        .empty-state {
+          text-align: center;
+          padding: 32px;
+          color: ${secondary_color};
+          font-size: 14px;
         }
       </style>
 
       <ha-card>
-        <div class="card-content">
-          <div class="card-header">
-            <div class="card-title"><span class="title-icon">💻</span><span>${title}</span></div>
-            <span class="computer-count">${totalCount} 台设备</span>
-          </div>
-          ${statsHtml}
-          <div class="computer-container">${bodyHtml}</div>
-          <div class="card-footer">
-            <div class="update-info"><span class="update-dot"></span><span>实时更新</span></div>
-          </div>
+        <div class="card-title">${title}</div>
+        ${statsHtml}
+        <div class="computers-grid ${gridClass}">
+          ${bodyHtml}
         </div>
       </ha-card>
     `;
 
-    // 渲染后绑定复制事件
     this._bindCopyEvents();
+    this._bindToggleEvents();
   }
 }
 
@@ -647,10 +741,14 @@ if (!customElements.get('computer-card')) {
   customElements.define('computer-card', ComputerCard);
 }
 
+// Register under both names for backwards compatibility
+if (!customElements.get('computer-status-card')) {
+  customElements.define('computer-status-card', ComputerCard);
+}
+
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'computer-card',
   name: '电脑状态卡片',
-  description: '显示电脑的运行状态、IP地址、MAC地址及用电信息',
-  documentationURL: 'https://github.com/j1617/computer-card',
+  description: '显示电脑状态，支持 IP/MAC 复制，支持远程开关机',
 });
