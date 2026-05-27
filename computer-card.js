@@ -1,13 +1,13 @@
 /**
  * Computer Card - Home Assistant Lovelace Custom Card
- * Version: 1.2.0
+ * Version: 1.2.1
  * Description: Display computer status (name, IP, MAC, power state, power consumption)
  * Compatible with HA 2024.x+ grid layout and visibility features
- * v1.2.0: Add toggle_entity support with confirmation dialog
+ * v1.2.1: Add toggle_entity support with confirmation dialog
  */
 
 console.info(
-  '%c COMPUTER-CARD %c v1.2.0 ',
+  '%c COMPUTER-CARD %c v1.2.1 ',
   'color: #3b82f6; font-weight: bold; background: #eff6ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #3b82f6; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
